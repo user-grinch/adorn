@@ -118,13 +118,20 @@ class InstallationEngine:
         def worker():
             nonlocal target_file
             if not target_file or not target_file.url:
-                task.status = "failed"
-                task.status_text = "No download URL available"
-                task.error_message = task.status_text
-                self.task_manager.notify(task)
-                if done_cb:
-                    GLib.idle_add(done_cb, False, task.status_text)
-                return
+                if item.category == ItemCategory.EXTENSIONS and (item.uuid or item.item_id):
+                    target_file = DownloadableFile(
+                        file_id="remote",
+                        name=item.uuid or item.item_id or item.name,
+                        download_url=f"https://extensions.gnome.org/extension/{item.uuid or item.item_id}",
+                    )
+                else:
+                    task.status = "failed"
+                    task.status_text = "No download URL available"
+                    task.error_message = task.status_text
+                    self.task_manager.notify(task)
+                    if done_cb:
+                        GLib.idle_add(done_cb, False, task.status_text)
+                    return
 
             def internal_progress(frac: float, msg: str, dl_bytes: int = 0, tot_bytes: int = 0):
                 task.progress = max(0.02, min(1.0, frac))
@@ -224,9 +231,39 @@ class InstallationEngine:
         progress_cb: Callable[[float, str, int, int], None],
         cancel_event: threading.Event,
     ) -> Tuple[bool, str, List[str], str]:
+        ext_uuid = item.uuid or item.item_id or ""
+
+        # 1. Primary method: Native dynamic GNOME Shell D-Bus installation
+        # This matches GNOME Extension Manager / extensions.gnome.org behavior.
+        # GNOME Shell directly downloads, verifies, compiles schemas, registers,
+        # loads, and activates the extension in the live compositor runtime
+        # without requiring the user to log out and log in.
+        if ext_uuid:
+            try:
+                from adorn.core.gsettings import GSettingsManager
+                gsm = GSettingsManager.get_default()
+                proxy = gsm._get_shell_extensions_proxy()
+                if proxy and proxy.get_name_owner():
+                    progress_cb(0.15, "Confirm installation in GNOME Shell prompt…", 0, 0)
+                    ok, res_msg = gsm.install_remote_extension(ext_uuid)
+                    if ok:
+                        dest = self.extensions_dir / ext_uuid
+                        progress_cb(1.0, f"Installed {item.name}", 0, 0)
+                        return True, f"Installed {item.name}", [str(dest)], ext_uuid
+                    elif "cancelled" in res_msg.lower():
+                        return False, "Installation cancelled by user", [], ""
+                    else:
+                        print(f"[Installer] InstallRemoteExtension failed ({res_msg}), falling back to direct package extraction")
+            except Exception as e:
+                print(f"[Installer] D-Bus extension installation failed: {e}, falling back to direct extraction")
+
+        if cancel_event.is_set():
+            return False, "Cancelled", [], ""
+
+        # 2. Fallback: Direct archive download and manual staging
+        # Used when D-Bus is unavailable (e.g., non-GNOME desktop, headless, or mock environment)
         tmp_dir = Path(tempfile.mkdtemp(prefix="adorn_ext_"))
         try:
-            ext_uuid = item.uuid or item.item_id or ""
             dl_path = tmp_dir / f"{ext_uuid or 'extension'}.shell-extension.zip"
             progress_cb(0.05, f"Connecting to extensions server…", 0, 0)
 
@@ -453,14 +490,21 @@ class InstallationEngine:
             if asset.category == ItemCategory.EXTENSIONS:
                 ext_dir = Path(asset.path) if asset.path else (self.extensions_dir / asset.name)
                 freed = compute_path_size(ext_dir)
-                res = subprocess.run(
-                    ["gnome-extensions", "uninstall", asset.name],
-                    capture_output=True,
-                    text=True,
-                    timeout=15,
-                )
-                if res.returncode != 0 and ext_dir.exists():
-                    shutil.rmtree(ext_dir, ignore_errors=True)
+                uninstalled = False
+                try:
+                    from adorn.core.gsettings import GSettingsManager
+                    uninstalled = GSettingsManager.get_default().uninstall_extension(asset.name)
+                except Exception:
+                    pass
+                if not uninstalled:
+                    res = subprocess.run(
+                        ["gnome-extensions", "uninstall", asset.name],
+                        capture_output=True,
+                        text=True,
+                        timeout=15,
+                    )
+                    if res.returncode != 0 and ext_dir.exists():
+                        shutil.rmtree(ext_dir, ignore_errors=True)
             else:
                 target = Path(asset.path)
                 if target.exists():

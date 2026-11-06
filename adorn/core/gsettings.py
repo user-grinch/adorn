@@ -1048,6 +1048,52 @@ window.background:backdrop {{
                 pass
         return []
 
+    def install_remote_extension(self, uuid: str) -> Tuple[bool, str]:
+        """Calls GNOME Shell's native InstallRemoteExtension D-Bus API to download,
+        install, register, and activate an extension dynamically without requiring a logout."""
+        proxy = self._get_shell_extensions_proxy()
+        if not proxy or not proxy.get_name_owner():
+            return False, "GNOME Shell Extensions service not available on D-Bus"
+        try:
+            res = proxy.call_sync(
+                "InstallRemoteExtension",
+                GLib.Variant("(s)", (uuid,)),
+                Gio.DBusCallFlags.NONE,
+                -1,
+                None,
+            )
+            if res:
+                result_str = str(res.unpack()[0])
+                if result_str == "successful":
+                    self.invalidate_asset_cache()
+                    return True, "successful"
+                elif result_str == "cancelled":
+                    return False, "Installation cancelled by user"
+                else:
+                    return False, f"GNOME Shell returned: {result_str}"
+        except Exception as e:
+            return False, f"GNOME Shell D-Bus installation failed: {e}"
+        return False, "Unknown error during extension installation"
+
+    def uninstall_extension(self, uuid: str) -> bool:
+        """Uninstalls and unloads an extension dynamically via GNOME Shell D-Bus."""
+        proxy = self._get_shell_extensions_proxy()
+        if proxy and proxy.get_name_owner():
+            try:
+                res = proxy.call_sync(
+                    "UninstallExtension",
+                    GLib.Variant("(s)", (uuid,)),
+                    Gio.DBusCallFlags.NONE,
+                    5000,
+                    None,
+                )
+                if res and res.unpack()[0]:
+                    self.invalidate_asset_cache()
+                    return True
+            except Exception:
+                pass
+        return False
+
     def toggle_extension(self, uuid: str, enable: bool) -> bool:
         self.invalidate_asset_cache()
         cmd_ok = False
