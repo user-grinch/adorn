@@ -66,7 +66,7 @@ Adorn includes packaging scripts in `scripts/` and configs in `packaging/`:
 - **Arch Linux:** `./scripts/build_arch.sh`
 - **AppImage:** `./scripts/build_appimage.sh`
 - **Source Tarball:** `./scripts/build_release_tarball.sh`
-- **Flatpak:** Manifest in `packaging/flatpak/com.grinch.gnome.adorn.yml`
+- **Flatpak:** `./scripts/build_flatpak.sh` (manifest in `packaging/flatpak/com.grinch.gnome.adorn.yml`)
 
 ---
 

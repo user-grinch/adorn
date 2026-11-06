@@ -1,9 +1,0 @@
-#!/bin/sh
-set -e
-
-# Unpack release tarball into /app/extra
-tar -xzf adorn-1.0.0.tar.gz -C /app/extra/
-rm -f adorn-1.0.0.tar.gz
-
-# Ensure executable bit on launcher
-chmod +x /app/extra/run.py

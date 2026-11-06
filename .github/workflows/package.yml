@@ -138,10 +138,10 @@ jobs:
             dist/*.AppDir.tar.gz
 
   flatpak:
-    name: Build Flatpak
+    name: Build Flatpak (.flatpak)
     runs-on: ubuntu-latest
     container:
-      image: bilelmoussaoui/flatpak-github-actions:gnome-47
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-47
       options: --privileged
     steps:
       - name: Checkout repository
@@ -151,19 +151,23 @@ jobs:
         run: |
           appstream-util validate-relax data/com.grinch.gnome.adorn.metainfo.xml || true
 
-      - name: Build Tarball For Flatpak Source
-        run: |
-          chmod +x scripts/build_release_tarball.sh
-          ./scripts/build_release_tarball.sh
+      - name: Build Flatpak Bundle
+        uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: adorn-1.0.0.flatpak
+          manifest-path: packaging/flatpak/com.grinch.gnome.adorn.yml
+          cache: false
 
-      - name: Check Flatpak Manifest Syntax
-        run: |
-          flatpak-builder --show-manifest packaging/flatpak/com.grinch.gnome.adorn.yml > /dev/null
+      - name: Upload Flatpak Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: flatpak-package
+          path: adorn-1.0.0.flatpak
 
   release:
     name: Create GitHub Release
     if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
-    needs: [ tarball, deb, rpm, arch, appimage ]
+    needs: [ tarball, deb, rpm, arch, appimage, flatpak ]
     runs-on: ubuntu-latest
     permissions:
       contents: write

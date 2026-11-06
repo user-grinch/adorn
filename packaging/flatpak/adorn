@@ -1,3 +1,0 @@
-#!/bin/sh
-export PYTHONPATH="/app/extra:${PYTHONPATH}"
-exec python3 /app/extra/run.py "$@"
