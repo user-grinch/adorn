@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>com.grinch.gnome.adorn</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Adorn</name>
+  <summary>GNOME Customization Storefront and Desktop Tweaks</summary>
+
+  <description>
+    <p>
+      Adorn is a native GTK4 and Libadwaita customization storefront and desktop tweaks manager for the GNOME desktop.
+    </p>
+    <p>Key highlights:</p>
+    <ul>
+      <li>Browse and install GNOME Shell extensions directly from extensions.gnome.org</li>
+      <li>Discover themes, icon packs, cursors, and wallpapers from OpenDesktop / gnome-look.org</li>
+      <li>Manage and configure active customizations with local backup protection</li>
+      <li>Download manager with live progress, retry, and cancellation controls</li>
+      <li>Curated, conflict-free desktop tweaks tailored for modern GNOME</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">com.grinch.gnome.adorn.desktop</launchable>
+
+  <developer id="user.grinch">
+    <name>Grinch_</name>
+  </developer>
+
+  <url type="homepage">https://github.com/user-grinch/adorn</url>
+  <url type="bugtracker">https://github.com/user-grinch/adorn/issues</url>
+  <url type="vcs-browser">https://github.com/user-grinch/adorn</url>
+  <url type="donation">https://www.patreon.com/c/grinch_</url>
+
+  <provides>
+    <binary>adorn</binary>
+  </provides>
+
+  <content_rating type="oars-1.1" />
+
+  <releases>
+    <release version="1.0.0" date="2026-11-06">
+      <description>
+        <p>Initial release of Adorn featuring unified storefront, local library manager, and focused desktop tweaks.</p>
+      </description>
+    </release>
+  </releases>
+</component>

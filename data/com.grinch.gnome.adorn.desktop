@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Adorn
+Comment=GNOME Customization Storefront & Desktop Tweaks
+Exec=adorn
+Icon=com.grinch.gnome.adorn
+Terminal=false
+Type=Application
+Categories=GNOME;GTK;Utility;
+StartupNotify=true
+StartupWMClass=com.grinch.gnome.adorn

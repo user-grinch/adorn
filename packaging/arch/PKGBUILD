@@ -1,0 +1,27 @@
+# Maintainer: Grinch_ <user.grinch@gmail.com>
+pkgname=adorn
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="GNOME Customization Storefront & Desktop Tweaks"
+arch=('any')
+url="https://github.com/user-grinch/adorn"
+license=('GPL-3.0-or-later')
+depends=('python' 'python-gobject' 'gtk4' 'libadwaita')
+makedepends=('python-build' 'python-installer' 'python-wheel' 'python-setuptools')
+source=("$pkgname-$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+    cd "$srcdir/$pkgname-$pkgver"
+    python -m build --wheel --no-isolation
+}
+
+package() {
+    cd "$srcdir/$pkgname-$pkgver"
+    python -m installer --destdir="$pkgdir" dist/*.whl
+
+    install -Dm644 data/com.grinch.gnome.adorn.desktop "$pkgdir/usr/share/applications/com.grinch.gnome.adorn.desktop"
+    install -Dm644 data/com.grinch.gnome.adorn.metainfo.xml "$pkgdir/usr/share/metainfo/com.grinch.gnome.adorn.metainfo.xml"
+    install -Dm644 data/icons/com.grinch.gnome.adorn.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/com.grinch.gnome.adorn.svg"
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

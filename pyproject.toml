@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "adorn"
+version = "1.0.0"
+description = "GNOME Customization Storefront & Desktop Tweaks"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "GPL-3.0-or-later"
+authors = [
+    { name = "Grinch_", email = "user.grinch@gmail.com" }
+]
+keywords = ["gnome", "gtk4", "libadwaita", "customization", "themes", "extensions"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: X11 Applications :: Gnome",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Topic :: Desktop Environment :: Gnome",
+]
+
+[project.scripts]
+adorn = "adorn.main:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["adorn*"]
+
+[tool.setuptools.package-data]
+adorn = ["ui/*.css"]

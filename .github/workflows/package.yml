@@ -1,0 +1,190 @@
+name: Build & Package
+
+on:
+  push:
+    branches: [ master, main ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ master, main ]
+  workflow_dispatch:
+
+jobs:
+  tarball:
+    name: Build Source Tarball
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Build Tarball
+        run: |
+          chmod +x scripts/build_release_tarball.sh
+          ./scripts/build_release_tarball.sh
+
+      - name: Upload Tarball Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-tarball
+          path: dist/*.tar.gz
+
+  deb:
+    name: Build Debian / Ubuntu (.deb)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build .deb Package
+        run: |
+          chmod +x scripts/build_deb.sh
+          ./scripts/build_deb.sh
+
+      - name: Upload Debian Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-package
+          path: dist/*.deb
+
+  rpm:
+    name: Build Fedora / RHEL (.rpm)
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
+    steps:
+      - name: Install dependencies
+        run: |
+          dnf install -y rpm-build python3-devel python3-setuptools git bash tar
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build RPM Package
+        run: |
+          chmod +x scripts/build_release_tarball.sh scripts/build_rpm.sh
+          ./scripts/build_rpm.sh
+
+      - name: Upload RPM Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpm-packages
+          path: dist/*.rpm
+
+  arch:
+    name: Build Arch Linux (.pkg.tar.zst)
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:latest
+    steps:
+      - name: Install build tools
+        run: |
+          pacman -Syu --noconfirm base-devel git python python-build python-installer python-wheel python-setuptools
+
+      - name: Create non-root build user
+        run: |
+          useradd -m builder
+          echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Fix permissions
+        run: chown -R builder:builder .
+
+      - name: Build Arch Package
+        run: |
+          chmod +x scripts/build_release_tarball.sh scripts/build_arch.sh
+          su builder -c "./scripts/build_arch.sh"
+
+      - name: Upload Arch Linux Package
+        uses: actions/upload-artifact@v4
+        with:
+          name: arch-package
+          path: dist/*.pkg.tar.*
+
+  appimage:
+    name: Build AppImage
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install tools & appimagetool
+        run: |
+          sudo sed -i "s/#\$nrconf{restart} = .*/\$nrconf{restart} = 'a';/" /etc/needrestart/needrestart.conf 2>/dev/null || true
+          sudo DEBIAN_FRONTEND=noninteractive apt-get update
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends file libglib2.0-0 wget curl
+          curl -sL https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage -o /tmp/appimagetool
+          chmod +x /tmp/appimagetool
+          sudo mv /tmp/appimagetool /usr/local/bin/appimagetool
+
+      - name: Build AppImage
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: 1
+        run: |
+          chmod +x scripts/build_appimage.sh packaging/appimage/AppRun
+          ./scripts/build_appimage.sh
+
+      - name: Upload AppImage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: appimage-package
+          path: |
+            dist/*.AppImage
+            dist/*.AppDir.tar.gz
+
+  flatpak:
+    name: Build Flatpak
+    runs-on: ubuntu-latest
+    container:
+      image: bilelmoussaoui/flatpak-github-actions:gnome-47
+      options: --privileged
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Validate Appstream Metainfo
+        run: |
+          appstream-util validate-relax data/com.grinch.gnome.adorn.metainfo.xml || true
+
+      - name: Build Tarball For Flatpak Source
+        run: |
+          chmod +x scripts/build_release_tarball.sh
+          ./scripts/build_release_tarball.sh
+
+      - name: Check Flatpak Manifest Syntax
+        run: |
+          flatpak-builder --show-manifest packaging/flatpak/com.grinch.gnome.adorn.yml > /dev/null
+
+  release:
+    name: Create GitHub Release
+    if: startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
+    needs: [ tarball, deb, rpm, arch, appimage ]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v1.0.0' }}
+          name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'Adorn v1.0.0' }}
+          files: |
+            release-assets/*
+          draft: false
+          prerelease: false
+          make_latest: true
+          generate_release_notes: true

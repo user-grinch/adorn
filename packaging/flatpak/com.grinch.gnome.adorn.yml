@@ -1,0 +1,66 @@
+app-id: com.grinch.gnome.adorn
+runtime: org.gnome.Platform
+runtime-version: '50'
+sdk: org.gnome.Sdk
+command: adorn
+
+finish-args:
+  # Display & GPU
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --share=ipc
+  - --device=dri
+  # Network access for extensions and themes APIs
+  - --share=network
+  # GNOME Shell extension DBus interface & session
+  - --talk-name=org.gnome.Shell
+  - --talk-name=org.gnome.Shell.Extensions
+  - --talk-name=org.gnome.SessionManager
+  # GSettings / dconf
+  - --talk-name=ca.desrt.dconf
+  - --filesystem=xdg-run/dconf
+  # Customization directories
+  - --filesystem=~/.local/share/gnome-shell/extensions:create
+  - --filesystem=~/.themes:create
+  - --filesystem=~/.icons:create
+  - --filesystem=xdg-data/themes:create
+  - --filesystem=xdg-data/icons:create
+  - --filesystem=xdg-config/gtk-4.0:create
+  - --filesystem=xdg-config/autostart:create
+  - --filesystem=xdg-pictures:ro
+  - --filesystem=xdg-download
+
+modules:
+  - name: adorn
+    buildsystem: simple
+    build-commands:
+      # Install desktop file, icon, metainfo
+      - install -Dm644 com.grinch.gnome.adorn.desktop /app/share/applications/com.grinch.gnome.adorn.desktop
+      - install -Dm644 com.grinch.gnome.adorn.metainfo.xml /app/share/metainfo/com.grinch.gnome.adorn.metainfo.xml
+      - install -Dm644 com.grinch.gnome.adorn.svg /app/share/icons/hicolor/scalable/apps/com.grinch.gnome.adorn.svg
+      # Install launcher & apply_extra scripts
+      - install -Dm755 adorn /app/bin/adorn
+      - install -Dm755 apply_extra /app/bin/apply_extra
+    sources:
+      # Release payload fetched at install time:
+      # Update URL, SHA256, and size when uploading a new release archive
+      - type: extra-data
+        url: https://github.com/user-grinch/adorn-releases/releases/download/v1.0.0/adorn-1.0.0.tar.gz
+        sha256: 0000000000000000000000000000000000000000000000000000000000000000
+        size: 0
+        filename: adorn-1.0.0.tar.gz
+
+      - type: file
+        path: adorn
+
+      - type: file
+        path: apply_extra
+
+      - type: file
+        path: com.grinch.gnome.adorn.desktop
+
+      - type: file
+        path: com.grinch.gnome.adorn.metainfo.xml
+
+      - type: file
+        path: com.grinch.gnome.adorn.svg

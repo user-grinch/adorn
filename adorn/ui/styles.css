@@ -1,0 +1,265 @@
+/* Adorn — Modern GNOME 51 / Libadwaita 1.10 Stylesheet
+ * Uses semantic Libadwaita CSS variables so Light, Dark, High-Contrast,
+ * and all GNOME System Accent Colors work natively without hardcoded palettes.
+ */
+
+/* --- Featured Hero Carousel --- */
+.hero-carousel-card {
+    background: linear-gradient(
+        135deg,
+        color-mix(in srgb, var(--accent-bg-color) 18%, var(--card-bg-color)) 0%,
+        var(--card-bg-color) 65%,
+        color-mix(in srgb, var(--accent-bg-color) 8%, var(--card-bg-color)) 100%
+    );
+    border-radius: 18px;
+    border: 1px solid color-mix(in srgb, var(--accent-color) 22%, transparent);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.06);
+}
+
+.hero-artwork-frame {
+    background-color: color-mix(in srgb, var(--window-fg-color) 6%, transparent);
+    border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--window-fg-color) 10%, transparent);
+}
+
+.hero-icon-squircle {
+    background-color: var(--card-bg-color);
+    border-radius: 14px;
+    border: 1px solid color-mix(in srgb, var(--window-fg-color) 10%, transparent);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    min-width: 56px;
+    min-height: 56px;
+}
+
+/* --- Storefront Category Tiles --- */
+.category-tile {
+    background-color: var(--card-bg-color);
+    border-radius: 14px;
+    padding: 14px 16px;
+    border: 1px solid color-mix(in srgb, var(--window-fg-color) 8%, transparent);
+    transition: background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.category-tile:hover {
+    background-color: color-mix(in srgb, var(--window-fg-color) 5%, var(--card-bg-color));
+    border-color: color-mix(in srgb, var(--accent-color) 35%, transparent);
+}
+
+.category-tile:active {
+    background-color: color-mix(in srgb, var(--window-fg-color) 9%, var(--card-bg-color));
+}
+
+.category-icon-badge {
+    background-color: color-mix(in srgb, var(--accent-bg-color) 15%, transparent);
+    color: var(--accent-color);
+    border-radius: 11px;
+    min-width: 40px;
+    min-height: 40px;
+}
+
+/* --- Filter Chips (Category Bar in Catalog Mode) --- */
+.filter-chip {
+    background-color: color-mix(in srgb, var(--window-fg-color) 6%, transparent);
+    border: 1px solid color-mix(in srgb, var(--window-fg-color) 8%, transparent);
+    border-radius: 99px;
+    padding: 5px 14px;
+    font-weight: 600;
+    font-size: 9.5pt;
+    transition: background-color 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.filter-chip:hover {
+    background-color: color-mix(in srgb, var(--window-fg-color) 11%, transparent);
+}
+
+.filter-chip.active-chip {
+    background-color: var(--accent-bg-color);
+    color: var(--accent-fg-color);
+    border-color: var(--accent-bg-color);
+}
+
+/* --- Storefront Item Cards --- */
+.store-item-card {
+    background-color: var(--card-bg-color);
+    border-radius: 14px;
+    padding: 14px 16px;
+    border: 1px solid color-mix(in srgb, var(--window-fg-color) 8%, transparent);
+    transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.store-item-card:hover {
+    background-color: color-mix(in srgb, var(--window-fg-color) 4%, var(--card-bg-color));
+    border-color: color-mix(in srgb, var(--accent-color) 32%, transparent);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.06);
+}
+
+.store-icon-frame {
+    background-color: color-mix(in srgb, var(--window-fg-color) 6%, transparent);
+    border-radius: 12px;
+    border: 1px solid color-mix(in srgb, var(--window-fg-color) 7%, transparent);
+    min-width: 56px;
+    min-height: 56px;
+}
+
+.download-icon-frame {
+    background-color: color-mix(in srgb, var(--window-fg-color) 6%, transparent);
+    border-radius: 10px;
+    border: 1px solid color-mix(in srgb, var(--window-fg-color) 7%, transparent);
+    min-width: 44px;
+    min-height: 44px;
+}
+
+.detail-icon-frame {
+    background-color: color-mix(in srgb, var(--window-fg-color) 6%, transparent);
+    border-radius: 18px;
+    border: 1px solid color-mix(in srgb, var(--window-fg-color) 8%, transparent);
+    min-width: 80px;
+    min-height: 80px;
+}
+
+/* --- Status & Metadata Badges --- */
+.badge-pill {
+    border-radius: 99px;
+    padding: 2px 9px;
+    font-size: 8pt;
+    font-weight: 700;
+}
+
+.badge-accent {
+    background-color: color-mix(in srgb, var(--accent-bg-color) 16%, transparent);
+    color: var(--accent-color);
+}
+
+.badge-success {
+    background-color: color-mix(in srgb, var(--success-bg-color) 18%, transparent);
+    color: var(--success-color);
+}
+
+.badge-warning {
+    background-color: color-mix(in srgb, var(--warning-bg-color) 18%, transparent);
+    color: var(--warning-color);
+}
+
+.badge-neutral {
+    background-color: color-mix(in srgb, var(--window-fg-color) 8%, transparent);
+    color: color-mix(in srgb, var(--window-fg-color) 75%, transparent);
+}
+
+/* --- Sidebar Count Pill --- */
+.sidebar-count {
+    background-color: color-mix(in srgb, var(--window-fg-color) 9%, transparent);
+    color: color-mix(in srgb, var(--window-fg-color) 75%, transparent);
+    border-radius: 99px;
+    padding: 1px 8px;
+    font-size: 8.5pt;
+    font-weight: 700;
+    min-width: 18px;
+}
+
+/* --- Detail Page Screenshot & Context Bar --- */
+.detail-screenshot-box {
+    background-color: color-mix(in srgb, var(--window-fg-color) 4%, transparent);
+    border-radius: 16px;
+    padding: 16px;
+    border: 1px solid color-mix(in srgb, var(--window-fg-color) 8%, transparent);
+}
+
+.context-bar {
+    background-color: var(--card-bg-color);
+    border-radius: 14px;
+    padding: 14px 12px;
+    border: 1px solid color-mix(in srgb, var(--window-fg-color) 8%, transparent);
+}
+
+.context-cell-value {
+    font-size: 12pt;
+    font-weight: 800;
+}
+
+.context-cell-label {
+    font-size: 8.5pt;
+    opacity: 0.68;
+}
+
+.description-card {
+    background-color: var(--card-bg-color);
+    border-radius: 14px;
+    padding: 18px 20px;
+    border: 1px solid color-mix(in srgb, var(--window-fg-color) 8%, transparent);
+}
+
+/* --- Pagination Footer Bar --- */
+.pagination-bar {
+    background-color: var(--card-bg-color);
+    border-radius: 14px;
+    padding: 10px 14px;
+    border: 1px solid color-mix(in srgb, var(--window-fg-color) 8%, transparent);
+}
+
+.page-btn {
+    min-width: 34px;
+    min-height: 34px;
+    border-radius: 9px;
+    padding: 0 8px;
+    font-weight: 600;
+}
+
+.page-btn.current-page {
+    background-color: var(--accent-bg-color);
+    color: var(--accent-fg-color);
+    font-weight: 800;
+}
+
+/* --- Wallpaper Grid Card in Installed & Explore --- */
+.wallpaper-card {
+    background-color: var(--card-bg-color);
+    border-radius: 16px;
+    border: 1px solid color-mix(in srgb, var(--window-fg-color) 8%, transparent);
+    transition: border-color 140ms ease, box-shadow 140ms ease;
+}
+
+.wallpaper-card:hover {
+    border-color: color-mix(in srgb, var(--accent-color) 40%, transparent);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10);
+}
+
+.wallpaper-card.wallpaper-active {
+    border: 2px solid var(--accent-bg-color);
+}
+
+/* --- Overview Summary Tiles --- */
+.overview-stat-card {
+    background-color: var(--card-bg-color);
+    border-radius: 14px;
+    padding: 14px 16px;
+    border: 1px solid color-mix(in srgb, var(--window-fg-color) 8%, transparent);
+}
+
+/* --- Progress Bar Refinement --- */
+progressbar trough {
+    min-height: 6px;
+    border-radius: 99px;
+}
+
+progressbar progress {
+    min-height: 6px;
+    border-radius: 99px;
+}
+
+/* --- Compact Action Buttons (Apply, Retry, Install, Dismiss, Trash, etc.) --- */
+button.compact-btn {
+    min-height: 28px;
+    padding: 3px 10px;
+    font-size: 8.5pt;
+    font-weight: 600;
+}
+
+button.compact-btn.circular {
+    min-width: 28px;
+    min-height: 28px;
+    padding: 0;
+}
+
+button.compact-btn image {
+    -gtk-icon-size: 14px;
+}
