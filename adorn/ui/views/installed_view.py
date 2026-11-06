@@ -380,10 +380,10 @@ class InstalledView(Gtk.Box):
         grp = Adw.PreferencesGroup()
         grp.set_title("Current Desktop State")
 
-        enabled_exts = self.gsettings.list_enabled_extensions()
+        active_ext_assets = [a for a in self.all_assets if a.category == ItemCategory.EXTENSIONS and a.is_active]
         master_on = self.gsettings.get_extensions_master_enabled()
         ext_sub = (
-            f"{len(enabled_exts)} enabled"
+            f"{len(active_ext_assets)} enabled"
             if master_on
             else "All user extensions paused (master toggle off)"
         )
@@ -717,6 +717,7 @@ class InstalledView(Gtk.Box):
         self.gsettings.set_extensions_master_enabled(state)
         self.toast_cb("User extensions enabled" if state else "User extensions paused")
         self._update_user_theme_banner()
+        self.refresh_assets(run_async=True)
 
     # =========================================================================
     # ROW & CARD BUILDERS
@@ -737,6 +738,16 @@ class InstalledView(Gtk.Box):
 
         row.set_subtitle(GLib.markup_escape_text(" • ".join(sub_parts)))
         row.set_icon_name("application-x-addon-symbolic")
+
+        if asset.error:
+            err_btn = Gtk.Button(icon_name="dialog-warning-symbolic")
+            err_btn.add_css_class("circular")
+            err_btn.add_css_class("flat")
+            err_btn.add_css_class("compact-btn")
+            err_btn.add_css_class("warning")
+            err_btn.set_valign(Gtk.Align.CENTER)
+            err_btn.set_tooltip_text(f"Extension Error: {asset.error}")
+            row.add_suffix(err_btn)
 
         if asset.has_prefs:
             prefs_btn = Gtk.Button(icon_name="emblem-system-symbolic")
@@ -760,9 +771,13 @@ class InstalledView(Gtk.Box):
             rm_btn.connect("clicked", lambda _b, a=asset: self._confirm_remove_asset(a))
             row.add_suffix(rm_btn)
 
+        master_on = self.gsettings.get_extensions_master_enabled()
         sw = Gtk.Switch()
         sw.set_valign(Gtk.Align.CENTER)
         sw.set_active(asset.is_active)
+        if not asset.is_system and not master_on:
+            sw.set_sensitive(False)
+            sw.set_tooltip_text("User extensions are globally paused (master switch off)")
         sw.connect("state-set", lambda _s, state, a=asset: self._on_toggle_extension(a, state))
         row.add_suffix(sw)
 
@@ -1022,7 +1037,7 @@ class InstalledView(Gtk.Box):
             self.toast_cb(f"{'Enabled' if state else 'Disabled'} {asset.display_name}")
             self._update_sidebar_counts()
             if self.ext_status_filter != "all":
-                self._render_active_section()
+                GLib.idle_add(self._render_active_section)
         return not ok
 
     def _confirm_remove_asset(self, asset: LocalAsset) -> None:

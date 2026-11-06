@@ -188,6 +188,7 @@ class LocalAsset:
     has_cursors: bool = False
     has_prefs: bool = False
     version: str = ""
+    error: str = ""
 
     def __post_init__(self):
         if not self.display_name:

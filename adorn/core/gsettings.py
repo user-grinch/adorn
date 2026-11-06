@@ -9,7 +9,7 @@ import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
-from gi.repository import Gio
+from gi.repository import Gio, GLib
 
 from .models import CustomizationItem, DesktopState, ItemCategory, LocalAsset
 from .task_manager import TaskManager
@@ -63,6 +63,7 @@ class GSettingsManager:
 
         self._asset_cache: Optional[List[LocalAsset]] = None
         self._asset_cache_time: float = 0.0
+        self._ext_proxy: Optional[Gio.DBusProxy] = None
 
     def _get_settings(self, schema_id: str) -> Optional[Gio.Settings]:
         if self._schema_source and self._schema_source.lookup(schema_id, True):
@@ -176,7 +177,7 @@ class GSettingsManager:
             return False
         if not self.get_extensions_master_enabled():
             return False
-        return self.USER_THEME_UUID in self.list_enabled_extensions()
+        return self.is_extension_enabled(self.USER_THEME_UUID)
 
     def enable_user_theme_extension(self) -> bool:
         if not self.get_extensions_master_enabled():
@@ -937,7 +938,46 @@ window.background:backdrop {{
     # 8. EXTENSIONS MANAGEMENT
     # =========================================================================
 
+    def _get_shell_extensions_proxy(self) -> Optional[Gio.DBusProxy]:
+        if self._ext_proxy is None:
+            try:
+                bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
+                self._ext_proxy = Gio.DBusProxy.new_sync(
+                    bus,
+                    Gio.DBusProxyFlags.NONE,
+                    None,
+                    "org.gnome.Shell.Extensions",
+                    "/org/gnome/Shell/Extensions",
+                    "org.gnome.Shell.Extensions",
+                    None,
+                )
+            except Exception:
+                self._ext_proxy = None
+        return self._ext_proxy
+
+    def get_all_extensions_runtime_info(self) -> Dict[str, Dict[str, Any]]:
+        """Queries live runtime info from GNOME Shell over D-Bus."""
+        proxy = self._get_shell_extensions_proxy()
+        if proxy and proxy.get_name_owner():
+            try:
+                res = proxy.call_sync("ListExtensions", None, Gio.DBusCallFlags.NONE, 2000, None)
+                if res:
+                    unpacked = res.unpack()[0]
+                    if isinstance(unpacked, dict):
+                        return unpacked
+            except Exception:
+                pass
+        return {}
+
     def get_extensions_master_enabled(self) -> bool:
+        proxy = self._get_shell_extensions_proxy()
+        if proxy and proxy.get_name_owner():
+            try:
+                prop = proxy.get_cached_property("UserExtensionsEnabled")
+                if prop is not None:
+                    return bool(prop.unpack())
+            except Exception:
+                pass
         if self.shell:
             try:
                 return not self.shell.get_boolean("disable-user-extensions")
@@ -954,10 +994,56 @@ window.background:backdrop {{
                 pass
         return False
 
+    def is_extension_enabled(self, uuid: str) -> bool:
+        runtime = self.get_all_extensions_runtime_info()
+        if runtime and uuid in runtime:
+            info = runtime[uuid]
+            is_sys = (info.get("type") == 1.0)
+            master_on = self.get_extensions_master_enabled()
+            if not is_sys and not master_on:
+                return False
+            return bool(info.get("enabled", False) and info.get("state") == 1.0)
+        return uuid in self.list_enabled_extensions()
+
     def list_enabled_extensions(self) -> List[str]:
+        runtime = self.get_all_extensions_runtime_info()
+        if runtime:
+            master_on = self.get_extensions_master_enabled()
+            out: List[str] = []
+            for uuid, info in runtime.items():
+                is_sys = (info.get("type") == 1.0)
+                is_en = bool(info.get("enabled", False) and info.get("state") == 1.0)
+                if not is_sys and not master_on:
+                    continue
+                if is_en:
+                    out.append(uuid)
+            return out
+
+        # Fallback 1: gnome-extensions CLI
+        try:
+            res = subprocess.run(
+                ["gnome-extensions", "list", "--enabled"],
+                capture_output=True,
+                text=True,
+                timeout=3,
+            )
+            if res.returncode == 0:
+                return [line.strip() for line in res.stdout.splitlines() if line.strip()]
+        except Exception:
+            pass
+
+        # Fallback 2: GSettings (accounting for disabled-extensions and master switch)
         if self.shell:
             try:
-                return list(self.shell.get_strv("enabled-extensions"))
+                master_on = self.get_extensions_master_enabled()
+                curr_enabled = set(self.shell.get_strv("enabled-extensions"))
+                curr_disabled = set(self.shell.get_strv("disabled-extensions")) if "disabled-extensions" in self.shell.list_keys() else set()
+                active = curr_enabled - curr_disabled
+                if not master_on:
+                    user_dir = Path.home() / ".local" / "share" / "gnome-shell" / "extensions"
+                    user_uuids = {d.name for d in user_dir.iterdir() if d.is_dir()} if user_dir.is_dir() else set()
+                    active = active - user_uuids
+                return list(active)
             except Exception:
                 pass
         return []
@@ -965,14 +1051,29 @@ window.background:backdrop {{
     def toggle_extension(self, uuid: str, enable: bool) -> bool:
         self.invalidate_asset_cache()
         cmd_ok = False
-        try:
-            cmd = ["gnome-extensions", "enable" if enable else "disable", uuid]
-            res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-            if res.returncode == 0:
-                cmd_ok = True
-        except Exception:
-            pass
 
+        # 1. Try D-Bus method
+        proxy = self._get_shell_extensions_proxy()
+        if proxy and proxy.get_name_owner():
+            try:
+                method = "EnableExtension" if enable else "DisableExtension"
+                res = proxy.call_sync(method, GLib.Variant("(s)", (uuid,)), Gio.DBusCallFlags.NONE, 3000, None)
+                if res and res.unpack()[0]:
+                    cmd_ok = True
+            except Exception:
+                pass
+
+        # 2. Try CLI if D-Bus call didn't succeed
+        if not cmd_ok:
+            try:
+                cmd = ["gnome-extensions", "enable" if enable else "disable", uuid]
+                res = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                if res.returncode == 0:
+                    cmd_ok = True
+            except Exception:
+                pass
+
+        # 3. Always synchronize GSettings keys
         if self.shell:
             try:
                 curr_enabled = list(self.shell.get_strv("enabled-extensions"))
@@ -984,7 +1085,7 @@ window.background:backdrop {{
                     if uuid in curr_disabled:
                         curr_disabled.remove(uuid)
                         self.shell.set_strv("disabled-extensions", curr_disabled)
-                    return True
+                    cmd_ok = True
                 else:
                     if uuid in curr_enabled:
                         curr_enabled.remove(uuid)
@@ -992,9 +1093,10 @@ window.background:backdrop {{
                     if uuid not in curr_disabled:
                         curr_disabled.append(uuid)
                         self.shell.set_strv("disabled-extensions", curr_disabled)
-                    return True
+                    cmd_ok = True
             except Exception:
                 pass
+
         return cmd_ok
 
     # =========================================================================
@@ -1376,8 +1478,12 @@ window.background:backdrop {{
                 continue
 
         # 4. GNOME Shell Extensions
+        runtime_exts = self.get_all_extensions_runtime_info()
+        master_on = self.get_extensions_master_enabled()
+
         ext_roots = [
             (Path.home() / ".local" / "share" / "gnome-shell" / "extensions", False),
+            (Path("/usr/local/share/gnome-shell/extensions"), True),
             (Path("/usr/share/gnome-shell/extensions"), True),
         ]
         for ext_root, is_sys in ext_roots:
@@ -1394,19 +1500,43 @@ window.background:backdrop {{
                     ext_desc = ""
                     ext_meta = None
                     ext_ver = ""
+                    ext_error = ""
+                    has_prefs = (entry / "prefs.js").exists()
+
+                    r_info = runtime_exts.get(uuid)
+                    if r_info:
+                        if not ext_title or ext_title == uuid:
+                            ext_title = r_info.get("name") or uuid
+                        ext_desc = r_info.get("description", "") or ""
+                        if r_info.get("version") is not None:
+                            ext_ver = str(r_info.get("version", ""))
+                        ext_error = str(r_info.get("error", ""))
+                        if r_info.get("hasPrefs") is not None:
+                            has_prefs = bool(r_info.get("hasPrefs"))
+                        is_active = bool(r_info.get("enabled", False) and r_info.get("state") == 1.0)
+                        if not is_sys and not master_on:
+                            is_active = False
+                    else:
+                        is_active = (uuid in enabled_exts)
+                        if not is_sys and not master_on:
+                            is_active = False
+
                     meta_file = entry / "metadata.json"
                     if meta_file.exists():
                         try:
                             meta = json.loads(meta_file.read_text(encoding="utf-8", errors="ignore"))
                             if isinstance(meta, dict):
                                 ext_meta = meta
-                                ext_title = str(meta.get("name", uuid)).strip() or uuid
-                                raw_desc = str(meta.get("description", "")).strip()
-                                ext_desc = raw_desc.split("\n")[0].strip() if raw_desc else ""
-                                if meta.get("version") is not None:
-                                    ext_ver = str(meta["version"])
-                                elif meta.get("version-name") is not None:
-                                    ext_ver = str(meta["version-name"])
+                                if not ext_title or ext_title == uuid:
+                                    ext_title = str(meta.get("name", uuid)).strip() or uuid
+                                if not ext_desc:
+                                    raw_desc = str(meta.get("description", "")).strip()
+                                    ext_desc = raw_desc.split("\n")[0].strip() if raw_desc else ""
+                                if not ext_ver:
+                                    if meta.get("version") is not None:
+                                        ext_ver = str(meta["version"])
+                                    elif meta.get("version-name") is not None:
+                                        ext_ver = str(meta["version-name"])
                         except Exception:
                             pass
 
@@ -1417,14 +1547,39 @@ window.background:backdrop {{
                         category=ItemCategory.EXTENSIONS,
                         path=str(entry),
                         is_system=is_sys,
-                        is_active=(uuid in enabled_exts),
-                        has_prefs=(entry / "prefs.js").exists(),
+                        is_active=is_active,
+                        has_prefs=has_prefs,
                         details=ext_desc or uuid,
                         author=self._infer_author(uuid, str(entry), is_sys, ext_meta),
                         version=ext_ver,
+                        error=ext_error,
                     )
             except Exception:
                 continue
+
+        # Add any extensions known to GNOME Shell runtime not found in above folders
+        for uuid, r_info in runtime_exts.items():
+            if f"ext:{uuid}" in assets_by_name:
+                continue
+            r_path = str(r_info.get("path", ""))
+            r_sys = (r_info.get("type") == 1.0)
+            is_active = bool(r_info.get("enabled", False) and r_info.get("state") == 1.0)
+            if not r_sys and not master_on:
+                is_active = False
+            assets_by_name[f"ext:{uuid}"] = LocalAsset(
+                name=uuid,
+                display_name=r_info.get("name") or uuid,
+                description=r_info.get("description") or "",
+                category=ItemCategory.EXTENSIONS,
+                path=r_path,
+                is_system=r_sys,
+                is_active=is_active,
+                has_prefs=bool(r_info.get("hasPrefs", False)),
+                details=r_info.get("description") or uuid,
+                author="",
+                version=str(r_info.get("version", "")) if r_info.get("version") is not None else "",
+                error=str(r_info.get("error", "")),
+            )
 
         res = list(assets_by_name.values())
         self._asset_cache = res
